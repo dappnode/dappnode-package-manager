@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
@@ -129,7 +130,7 @@ contract Registry is AccessControlEnumerable {
     address _dev,
     uint8 flags,
     string memory _version,
-    bytes memory _contentURI
+    string memory _contentURI
   ) external onlyAddPackageRole returns (Repo) {
     Repo repo = Repo(Clones.clone(repoImplementation));
 
@@ -165,10 +166,7 @@ contract Registry is AccessControlEnumerable {
    * @param _packageList See `packageList` for format details.
    * @param _bytesPerListItem See `packageList` for format details. Set to 0 to not update.
    */
-  function setList(bytes memory _packageList, uint64 _bytesPerListItem)
-    external
-    onlyRole(SET_LIST_ROLE)
-  {
+  function setList(bytes memory _packageList, uint64 _bytesPerListItem) external onlyRole(SET_LIST_ROLE) {
     packageList = _packageList;
 
     if (_bytesPerListItem > 0) {
@@ -179,10 +177,7 @@ contract Registry is AccessControlEnumerable {
   /**
    * @notice Change package status with a new flags bitfield
    */
-  function setPackageStatus(uint256 packageIdx, uint8 flags)
-    external
-    onlyRole(SET_STATUS_ROLE)
-  {
+  function setPackageStatus(uint256 packageIdx, uint8 flags) external onlyRole(SET_STATUS_ROLE) {
     Package storage package = packages[packageIdx];
     package.flags = flags;
     emit UpdateStatus(packageIdx, flags);
@@ -191,10 +186,7 @@ contract Registry is AccessControlEnumerable {
   /**
    * @dev Extension logic to ADD_PACKAGE_ROLE. If true any address can add package.
    */
-  function setAddPackageAnyAddress(bool _addPackageAnyAddress)
-    external
-    onlyRole(getRoleAdmin(ADD_PACKAGE_ROLE))
-  {
+  function setAddPackageAnyAddress(bool _addPackageAnyAddress) external onlyRole(getRoleAdmin(ADD_PACKAGE_ROLE)) {
     addPackageAnyAddress = _addPackageAnyAddress;
   }
 
@@ -212,11 +204,7 @@ contract Registry is AccessControlEnumerable {
   /**
    * @dev Return the package data of a package name if existent
    */
-  function getPackage(string memory _name)
-    public
-    view
-    returns (Package memory)
-  {
+  function getPackage(string memory _name) public view returns (Package memory) {
     Package storage package = packages[getPackageIdx(_name)];
     return (package);
   }
@@ -233,10 +221,7 @@ contract Registry is AccessControlEnumerable {
    * if addPackageAnyAddress == true
    */
   modifier onlyAddPackageRole() {
-    require(
-      hasRole(ADD_PACKAGE_ROLE, _msgSender()) || addPackageAnyAddress,
-      "NO_ADD_PACKAGE_ROLE"
-    );
+    require(hasRole(ADD_PACKAGE_ROLE, _msgSender()) || addPackageAnyAddress, "NO_ADD_PACKAGE_ROLE");
     _;
   }
 

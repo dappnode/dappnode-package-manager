@@ -1,0 +1,17 @@
+name: Tests
+
+on: [pull_request, push]
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      # <common-build> - Uses YAML anchors in the future
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "lts/gallium"
+      - run: npm install
+      - run: npm build
+      - run: npm test

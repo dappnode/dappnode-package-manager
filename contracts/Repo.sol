@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -9,12 +10,12 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgrad
  * CREATE_VERSION_ROLE allows adding new versions.
  */
 contract Repo is Initializable, AccessControlEnumerableUpgradeable {
-  bytes32 public constant CREATE_VERSION_ROLE =
-    keccak256("CREATE_VERSION_ROLE");
+  bytes32 public constant CREATE_VERSION_ROLE = keccak256("CREATE_VERSION_ROLE");
 
   struct Version {
     string version;
-    bytes contentURI;
+    // TODO: is there any difference between using bytes and string here?
+    string contentURI;
   }
 
   // string public name;
@@ -22,7 +23,7 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   mapping(uint256 => Version) public versions;
   mapping(bytes32 => uint256) public versionIdForSemantic;
 
-  event NewVersion(uint256 versionId, string version, bytes contentURI);
+  event NewVersion(uint256 versionId, string version, string contentURI);
 
   constructor() initializer {}
 
@@ -42,10 +43,7 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
    * @param _version Version string (i.e. semantic version) for new repo version
    * @param _contentURI External URI for fetching new version's content
    */
-  function newVersion(string memory _version, bytes memory _contentURI)
-    external
-    onlyRole(CREATE_VERSION_ROLE)
-  {
+  function newVersion(string memory _version, string memory _contentURI) external onlyRole(CREATE_VERSION_ROLE) {
     // Can only publish each version string once
     bytes32 versionHash = semanticVersionHash(_version);
     require(versionIdForSemantic[versionHash] == 0, "REPO_EXISTENT_VERSION");
@@ -57,41 +55,24 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
     emit NewVersion(versionId, _version, _contentURI);
   }
 
-  function getLastPublished()
-    public
-    view
-    returns (string memory version, bytes memory contentURI)
-  {
+  function getLastPublished() public view returns (Version memory) {
     return getByVersionId(nextIdx - 1);
   }
 
-  function getBySemanticVersion(string memory _version)
-    public
-    view
-    returns (string memory version, bytes memory contentURI)
-  {
+  function getBySemanticVersion(string memory _version) public view returns (Version memory) {
     return getByVersionId(versionIdForSemantic[semanticVersionHash(_version)]);
   }
 
-  function getByVersionId(uint256 _versionId)
-    public
-    view
-    returns (string memory version, bytes memory contentURI)
-  {
+  function getByVersionId(uint256 _versionId) public view returns (Version memory) {
     require(_versionId > 0 && _versionId < nextIdx, "REPO_INEXISTENT_VERSION");
-    Version storage versionStruct = versions[_versionId];
-    return (versionStruct.version, versionStruct.contentURI);
+    return versions[_versionId];
   }
 
   function getVersionsCount() public view returns (uint256) {
     return nextIdx - 1;
   }
 
-  function semanticVersionHash(string memory version)
-    internal
-    pure
-    returns (bytes32)
-  {
+  function semanticVersionHash(string memory version) internal pure returns (bytes32) {
     return keccak256(abi.encodePacked(version));
   }
 }
