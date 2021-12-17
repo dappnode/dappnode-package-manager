@@ -9,9 +9,8 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgrad
  * CREATE_VERSION_ROLE allows adding new versions.
  */
 contract Repo is Initializable, AccessControlEnumerableUpgradeable {
-  // bytes32 public constant DISTRIBUTOR_ROLE = keccak256("CREATE_VERSION_ROLE");
   bytes32 public constant CREATE_VERSION_ROLE =
-    0x1f56cfecd3595a2e6cc1a7e6cb0b20df84cdbd92eff2fee554e70e4e45a9a7d8;
+    keccak256("CREATE_VERSION_ROLE");
 
   struct Version {
     string version;
