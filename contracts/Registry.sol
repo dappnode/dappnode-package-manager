@@ -84,9 +84,7 @@ contract Registry is AccessControlEnumerable {
   event UpdateStatus(uint256 packageIdx, uint8 flags);
 
   /**
-   * NEEDS CREATE_NAME_ROLE and POINT_ROOTNODE_ROLE permissions on registrar
-   * @dev Initialize can only be called once. It saves the block number in which it was initialized
-   * @notice Initialize this APMRegistry instance and set `_registrar` as the ENS subdomain registrar
+   * @param _registryName Name to identify this registry, i.e. 'dnp.dappnode.eth'
    */
   constructor(string memory _registryName) {
     registryName = _registryName;
