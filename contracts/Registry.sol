@@ -39,7 +39,11 @@ contract Registry is AccessControlEnumerable {
     string name;
   }
 
-  address immutable repoImplementation;
+  /**
+   * @dev Name to identify this registry, i.e. 'dnp.dappnode.eth'
+   */
+  string public registryName;
+  address public immutable repoImplementation;
 
   uint64 internal nextIdx;
   /**
@@ -60,7 +64,7 @@ contract Registry is AccessControlEnumerable {
    * @dev Map of package nameHash to packageIdx to ensure name uniqueness
    * packageIdx => Package
    */
-  mapping(bytes32 => uint256) public packageForName;
+  mapping(bytes32 => uint256) public packageIdxByName;
 
   /**
    * @dev Compact list of packageIdx'es in some order. This list may signal
@@ -84,7 +88,8 @@ contract Registry is AccessControlEnumerable {
    * @dev Initialize can only be called once. It saves the block number in which it was initialized
    * @notice Initialize this APMRegistry instance and set `_registrar` as the ENS subdomain registrar
    */
-  constructor() {
+  constructor(string memory _registryName) {
+    registryName = _registryName;
     nextIdx = 1;
     bytesPerListItem = 1;
 
@@ -196,6 +201,36 @@ contract Registry is AccessControlEnumerable {
   }
 
   /**
+   * @dev Return the index of a package name if existent
+   */
+  function getPackageIdx(string memory _name) public view returns (uint256) {
+    bytes32 nameHash = keccak256(abi.encodePacked(_name));
+    uint256 packageIdx = packageIdxByName[nameHash];
+    require(packageIdx > 0, "REGISTRY_INEXISTENT_NAME");
+
+    return packageIdx;
+  }
+
+  /**
+   * @dev Return the package data of a package name if existent
+   */
+  function getPackage(string memory _name)
+    public
+    view
+    returns (Package memory)
+  {
+    Package storage package = packages[getPackageIdx(_name)];
+    return (package);
+  }
+
+  /**
+   * @dev Return total count of packages to iterate `packageIdxByName`
+   */
+  function getPackageCount() public view returns (uint256) {
+    return nextIdx - 1;
+  }
+
+  /**
    * @dev Extension logic to `onlyRole(ADD_PACKAGE_ROLE)` allowing any address
    * if addPackageAnyAddress == true
    */
@@ -218,7 +253,7 @@ contract Registry is AccessControlEnumerable {
     require(bytes(_name).length > 0, "REGISTRY_EMPTY_NAME");
 
     bytes32 nameHash = keccak256(abi.encodePacked(_name));
-    require(packageForName[nameHash] == 0, "REGISTRY_EXISTENT_NAME");
+    require(packageIdxByName[nameHash] == 0, "REGISTRY_EXISTENT_NAME");
 
     // To set non-default flags must have SET_STATUS_ROLE. If the ADD_PACKAGE_ROLE
     // is permission-less flags should be used to curate packages.
@@ -229,7 +264,7 @@ contract Registry is AccessControlEnumerable {
 
     uint256 packageIdx = nextIdx++;
     packages[packageIdx] = Package(_flags, _repo, _name);
-    packageForName[nameHash] = packageIdx;
+    packageIdxByName[nameHash] = packageIdx;
 
     emit AddPackage(packageIdx, _name, _repo);
   }

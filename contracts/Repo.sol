@@ -19,18 +19,20 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   }
 
   // string public name;
-  uint256 internal nextIndex;
+  uint256 internal nextIdx;
   mapping(uint256 => Version) public versions;
   mapping(bytes32 => uint256) public versionIdForSemantic;
 
   event NewVersion(uint256 versionId, string version, bytes contentURI);
+
+  constructor() initializer {}
 
   /**
    * @dev Initialize can only be called once.
    * @notice Initialize this Repo
    */
   function initialize(address _admin) public initializer {
-    nextIndex = 1;
+    nextIdx = 1;
 
     _setupRole(DEFAULT_ADMIN_ROLE, _admin);
     _setupRole(CREATE_VERSION_ROLE, _admin);
@@ -49,7 +51,7 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
     bytes32 versionHash = semanticVersionHash(_version);
     require(versionIdForSemantic[versionHash] == 0, "REPO_EXISTENT_VERSION");
 
-    uint256 versionId = nextIndex++;
+    uint256 versionId = nextIdx++;
     versions[versionId] = Version(_version, _contentURI);
     versionIdForSemantic[versionHash] = versionId;
 
@@ -61,7 +63,7 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
     view
     returns (string memory version, bytes memory contentURI)
   {
-    return getByVersionId(nextIndex - 1);
+    return getByVersionId(nextIdx - 1);
   }
 
   function getBySemanticVersion(string memory _version)
@@ -77,16 +79,13 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
     view
     returns (string memory version, bytes memory contentURI)
   {
-    require(
-      _versionId > 0 && _versionId < nextIndex,
-      "REPO_INEXISTENT_VERSION"
-    );
+    require(_versionId > 0 && _versionId < nextIdx, "REPO_INEXISTENT_VERSION");
     Version storage versionStruct = versions[_versionId];
     return (versionStruct.version, versionStruct.contentURI);
   }
 
   function getVersionsCount() public view returns (uint256) {
-    return nextIndex - 1;
+    return nextIdx - 1;
   }
 
   function semanticVersionHash(string memory version)
