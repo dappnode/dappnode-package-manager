@@ -14,7 +14,6 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
 
   struct Version {
     string version;
-    // TODO: is there any difference between using bytes and string here?
     string contentURI;
   }
 

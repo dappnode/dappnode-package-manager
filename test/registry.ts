@@ -1,8 +1,14 @@
 import {expect} from "chai";
 import {ethers} from "hardhat";
 import {Event} from "ethers";
-import {Registry} from "../typechain-types/Registry";
-import {Repo} from "../typechain-types/Repo";
+import {Registry, PackageStruct} from "../typechain-types/Registry";
+import {Repo, VersionStruct} from "../typechain-types/Repo";
+
+interface RepoPackage {
+  name: string;
+  dev: string;
+  flags: number;
+}
 
 describe("Registry", function () {
   it("dnp.dappnode registry publish one package", async function () {
@@ -10,17 +16,17 @@ describe("Registry", function () {
 
     const registryName = "dnp.dappnode";
 
-    const newVersion1: RepoVersion = {
+    const newVersion1: VersionStruct = {
       version: "0.1.0",
       contentURI: "/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     };
 
-    const newVersion2: RepoVersion = {
+    const newVersion2: VersionStruct = {
       version: "0.2.0-beta.0",
       contentURI: "/ipfs/Qmbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     };
 
-    const newPackage = {
+    const newPackage: RepoPackage = {
       name: "gnosis",
       dev: addr1.address,
       flags: 0,
@@ -36,11 +42,14 @@ describe("Registry", function () {
     // Publish new repo from admin account
     const {repo: newRepoAddress} = await publishRepoVersion(registry, newPackage, newVersion1);
 
+    // Assert registry packages
+    await assertPackages(registry, [{flags: newPackage.flags, repo: newRepoAddress, name: newPackage.name}])
+
     // Connect to deployed repo
     const repoWithAdmin = (await ethers.getContractAt("Repo", newRepoAddress, owner)) as Repo;
     const repoWithDev = (await ethers.getContractAt("Repo", newRepoAddress, addr1)) as Repo;
 
-    // Assert that there are two version in the Repo contract
+    // Assert that there are a version in the Repo contract
     await assertRepoVersions(repoWithDev, [newVersion1]);
 
     // Ensure it's already initialized
@@ -102,7 +111,7 @@ describe("Registry", function () {
     // Test that non-auth users can NOT publish packages
     const registryUser = (await ethers.getContractAt("Registry", registryAdmin.address, addr1)) as Registry;
     await expect(publishRepoVersion(registryUser, newPackage, newVersion1)).to.be.revertedWith(
-      "Initializable: contract is already initialized"
+      "NO_ADD_PACKAGE_ROLE"
     );
 
     // Allow anyone to publish package
@@ -110,6 +119,9 @@ describe("Registry", function () {
 
     // Test that non-auth users DO can publish packages
     const {repo: newRepoAddress} = await publishRepoVersion(registryUser, newPackage, newVersion1);
+
+    // Assert registry packages
+    await assertPackages(registryUser, [{flags: newPackage.flags, repo: newRepoAddress, name: newPackage.name}])
 
     // Connect to deployed repo
     const repoUser = (await ethers.getContractAt("Repo", newRepoAddress, addr1)) as Repo;
@@ -119,21 +131,10 @@ describe("Registry", function () {
   });
 });
 
-interface RepoVersion {
-  version: string;
-  contentURI: string;
-}
-
-interface RepoPackage {
-  name: string;
-  dev: string;
-  flags: number;
-}
-
 /**
  * Call newPackageWithVersion and assert event is correct
  */
-async function publishRepoVersion(registry: Registry, pkg: RepoPackage, version: RepoVersion): Promise<{repo: string}> {
+async function publishRepoVersion(registry: Registry, pkg: RepoPackage, version: VersionStruct): Promise<{repo: string}> {
   const newPackageWithVersionTx = await registry.newPackageWithVersion(
     pkg.name,
     pkg.dev,
@@ -160,11 +161,11 @@ async function publishRepoVersion(registry: Registry, pkg: RepoPackage, version:
   return {repo};
 }
 
-async function assertRepoVersions(repo: Repo, expectedVersions: RepoVersion[]) {
+async function assertRepoVersions(repo: Repo, expectedVersions: VersionStruct[]) {
   const versionCountBN = await repo.getVersionsCount();
   const versionCount = versionCountBN.toNumber();
 
-  const versions: RepoVersion[] = [];
+  const versions: VersionStruct[] = [];
 
   for (let i = 1; i < versionCount + 1; i++) {
     const version = await repo.getByVersionId(i);
@@ -175,6 +176,24 @@ async function assertRepoVersions(repo: Repo, expectedVersions: RepoVersion[]) {
   }
 
   expect(versions).to.deep.equal(expectedVersions, "Wrong versions in repo");
+}
+
+async function assertPackages(registry: Registry, expectedPackages: PackageStruct[]) {
+  const packageCountBN = await registry.getPackageCount();
+  const packageCount = packageCountBN.toNumber();
+
+  const packages: PackageStruct[] = [];
+
+  for (let i = 1; i < packageCount + 1; i++) {
+    const currentPackage = await registry.packages(i) as PackageStruct;
+    packages.push({
+      flags: currentPackage.flags,
+      repo: currentPackage.repo,
+      name: currentPackage.name,
+    });
+  }
+
+  expect(packages).to.deep.equal(expectedPackages, "Wrong versions in repo");
 }
 
 function getEvent(events: Event[] = [], eventName: string): Event {
