@@ -182,11 +182,11 @@ contract Registry is AccessControlEnumerable {
     package.flags = flags;
 
     // If banned flag is setted, the name should be freed from the mapping
-    if((flags & uint8(8)) == 1) {
+    if(((flags >> 3) & uint8(1)) == 1) {
       bytes32 nameHash = keccak256(abi.encodePacked(package.name));
       packageIdxByName[nameHash] = 0;
     }
-    
+
     emit UpdateStatus(packageIdx, flags);
   }
 

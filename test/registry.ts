@@ -129,6 +129,76 @@ describe("Registry", function () {
     // Assert that there are two version in the Repo contract
     await assertRepoVersions(repoUser, [newVersion1]);
   });
+
+  it("public.dappnode registry publish one package and set flags", async function () {
+    const [owner, addr1] = await ethers.getSigners();
+
+    const registryName = "dnp.dappnode";
+
+    const newVersion1: VersionStruct = {
+      version: "0.1.0",
+      contentURI: "/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    };
+
+    const newPackage: RepoPackage = {
+      name: "gnosis",
+      dev: addr1.address,
+      flags: 0,
+    };
+
+    const Registry = await ethers.getContractFactory("Registry");
+    const registry = (await Registry.deploy(registryName)) as Registry;
+
+    await registry.deployed();
+
+    expect(await registry.registryName()).to.equal(registryName, "Wrong registryName");
+
+    // Publish new repo from admin account
+    const {repo: newRepoAddress} = await publishRepoVersion(registry, newPackage, newVersion1);
+
+    // Assert registry packages
+    await assertPackages(registry, [{flags: newPackage.flags, repo: newRepoAddress, name: newPackage.name}])
+
+    // Connect to deployed repo
+    const repoWithDev = (await ethers.getContractAt("Repo", newRepoAddress, addr1)) as Repo;
+
+    // Assert that there are a version in the Repo contract
+    await assertRepoVersions(repoWithDev, [newVersion1]);
+
+    // Set flags using the following:
+    // Bitfield with status flags, TBD
+    // 0 - visible
+    // 1 - active
+    // 2 - validated
+    // 3 - banned
+    const nameHash = ethers.utils.solidityKeccak256(["string"], [newPackage.name]);
+    const packageIdx = 1;
+    expect(await registry.getPackageIdx(newPackage.name)).to.be.equal(packageIdx);
+    expect(await registry.packageIdxByName(nameHash)).to.be.equal(packageIdx);
+
+    // Calculate flag value for visible, active and validated
+    const flagValue = calculateFlagValue(true, true, true, false);
+
+    // Set package flags
+    await registry.setPackageStatus(packageIdx, flagValue);
+
+    // Assert registry packages
+    await assertPackages(registry, [{flags: flagValue, repo: newRepoAddress, name: newPackage.name}])
+    expect(await registry.getPackageIdx(newPackage.name)).to.be.equal(packageIdx);
+
+    // Calculate flag value banned
+    const bannedFlag = calculateFlagValue(false, false, false, true);
+
+    // Set package flags
+    await registry.setPackageStatus(packageIdx, bannedFlag);
+
+    // Assert registry packages
+    await assertPackages(registry, [{flags: bannedFlag, repo: newRepoAddress, name: newPackage.name}])
+
+    // Package should have been removed from the packageIdxByName mapping
+    await expect(registry.getPackageIdx(newPackage.name)).to.be.revertedWith("REGISTRY_INEXISTENT_NAME");
+    expect(await registry.packageIdxByName(nameHash)).to.be.equal(0);
+  });
 });
 
 /**
@@ -202,4 +272,9 @@ function getEvent(events: Event[] = [], eventName: string): Event {
     throw Error(`No event found for ${eventName}`);
   }
   return event;
+}
+
+function calculateFlagValue(visible: Boolean, active: Boolean,validated: Boolean, banned: Boolean): number {
+  const value = Number(visible) + Number(active)*2 + Number(validated)*4 + Number(banned)*8;
+  return value;
 }
