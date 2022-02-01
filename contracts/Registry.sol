@@ -14,6 +14,9 @@ import "./Repo.sol";
 contract Registry is AccessControlEnumerable {
   bytes32 public constant ADD_PACKAGE_ROLE = keccak256("ADD_PACKAGE_ROLE");
   bytes32 public constant SET_STATUS_ROLE = keccak256("SET_STATUS_ROLE");
+  // This role should be used only for extreme cirumstances since it breaks the immutability of packages.
+  // If this Registry is properly mantain this role should be burned to ensure such immutability.
+  bytes32 public constant SET_REPO_ROLE = keccak256("SET_REPO_ROLE");
   bytes32 public constant SET_LIST_ROLE = keccak256("SET_LIST_ROLE");
 
   /**
@@ -83,6 +86,7 @@ contract Registry is AccessControlEnumerable {
 
   event AddPackage(uint256 packageIdx, string name, address repo);
   event UpdateStatus(uint256 packageIdx, uint8 flags);
+  event UpdateRepo(uint256 packageIdx, address repo);
 
   /**
    * @param _registryName Name to identify this registry, i.e. 'dnp.dappnode.eth'
@@ -181,13 +185,18 @@ contract Registry is AccessControlEnumerable {
     Package storage package = packages[packageIdx];
     package.flags = flags;
 
-    // If banned flag is setted, the name should be freed from the mapping
-    if(((flags >> 3) & uint8(1)) == 1) {
-      bytes32 nameHash = keccak256(abi.encodePacked(package.name));
-      packageIdxByName[nameHash] = 0;
-    }
-
     emit UpdateStatus(packageIdx, flags);
+  }
+
+  /**
+   * @notice Change package repo address.
+   * Should only be used in extreme circustances to recover a useful name.
+   */
+  function setPackageRepo(uint256 packageIdx, address repo) external onlyRole(SET_REPO_ROLE) {
+    Package storage package = packages[packageIdx];
+    package.repo = repo;
+
+    emit UpdateRepo(packageIdx, repo);
   }
 
   /**
