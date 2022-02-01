@@ -180,6 +180,13 @@ contract Registry is AccessControlEnumerable {
   function setPackageStatus(uint256 packageIdx, uint8 flags) external onlyRole(SET_STATUS_ROLE) {
     Package storage package = packages[packageIdx];
     package.flags = flags;
+
+    // If banned flag is setted, the name should be freed from the mapping
+    if(((flags >> 3) & uint8(1)) == 1) {
+      bytes32 nameHash = keccak256(abi.encodePacked(package.name));
+      packageIdxByName[nameHash] = 0;
+    }
+
     emit UpdateStatus(packageIdx, flags);
   }
 

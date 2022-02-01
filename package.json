@@ -2,7 +2,9 @@
   "name": "dappnode-package-manager",
   "scripts": {
     "build": "npx hardhat compile",
-    "test": "npx hardhat test"
+    "test": "npx hardhat test",
+    "deploy:registry:hardhat": "npx hardhat run scripts/deploy-registry.ts --network hardhat",
+    "deploy:registry:xDai": "npx hardhat run scripts/deploy-registry.ts --network xDAI"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
