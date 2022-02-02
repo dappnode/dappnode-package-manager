@@ -25,12 +25,11 @@ contract Registry is AccessControlEnumerable {
   struct Package {
     /**
      * @dev Bitfield with status flags, TBD
-     * 0 - visible
-     * 1 - active
-     * 2 - validated
-     * 3 - banned
+     * 0 - active
+     * 1 - validated
+     * 2 - banned
      */
-    uint8 flags;
+    uint64 flags;
     /**
      * @dev Address of the Repo contract
      * TODO: Consider making it generic to non blockchain sources
@@ -85,7 +84,7 @@ contract Registry is AccessControlEnumerable {
   bytes public packageList;
 
   event AddPackage(uint256 packageIdx, string name, address repo);
-  event UpdateStatus(uint256 packageIdx, uint8 flags);
+  event UpdateStatus(uint256 packageIdx, uint64 flags);
   event UpdateRepo(uint256 packageIdx, address repo);
 
   /**
@@ -113,7 +112,7 @@ contract Registry is AccessControlEnumerable {
   function newPackage(
     string memory _name,
     address _dev,
-    uint8 _flags
+    uint64 _flags
   ) external onlyAddPackageRole returns (Repo) {
     Repo repo = Repo(Clones.clone(repoImplementation));
 
@@ -132,7 +131,7 @@ contract Registry is AccessControlEnumerable {
   function newPackageWithVersion(
     string memory _name,
     address _dev,
-    uint8 flags,
+    uint64 flags,
     string memory _version,
     string memory _contentURI
   ) external onlyAddPackageRole returns (Repo) {
@@ -160,7 +159,7 @@ contract Registry is AccessControlEnumerable {
   function addPackage(
     string memory _name,
     address _repo,
-    uint8 flags
+    uint64 flags
   ) external onlyAddPackageRole {
     _addPackage(_name, _repo, flags);
   }
@@ -181,7 +180,7 @@ contract Registry is AccessControlEnumerable {
   /**
    * @notice Change package status with a new flags bitfield
    */
-  function setPackageStatus(uint256 packageIdx, uint8 flags) external onlyRole(SET_STATUS_ROLE) {
+  function setPackageStatus(uint256 packageIdx, uint64 flags) external onlyRole(SET_STATUS_ROLE) {
     Package storage package = packages[packageIdx];
     package.flags = flags;
 
@@ -247,7 +246,7 @@ contract Registry is AccessControlEnumerable {
   function _addPackage(
     string memory _name,
     address _repo,
-    uint8 _flags
+    uint64 _flags
   ) internal {
     require(bytes(_name).length > 0, "REGISTRY_EMPTY_NAME");
 

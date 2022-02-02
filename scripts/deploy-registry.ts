@@ -4,9 +4,7 @@ import {Registry} from "../typechain-types/Registry";
 async function main() {
   const registryName = "dnp.dappnode";
 
-  /*
-        Deploy Registry contract
-  */
+  /* Deploy Registry contract */
   console.log("\n#######################");
   console.log("##### Deployment Registry Contract #####");
   console.log("#######################");

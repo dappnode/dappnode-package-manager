@@ -63,3 +63,49 @@ Every interval, repeat step 1 to 2.
 bytes ordering // 0x0502000000000... To sort [5, 2]
 uint bytesPerIndex = 1
 ```
+
+# Migration
+
+- Migrate all versions or only latest?
+- For external packages, how to handle permissions?
+
+Original owner must be able to claim full ownership of the repo. Once the claim action is done DAppNode team must not have priviledges on the package.
+
+- Grant to original owner DEFAULT_ADMIN_ROLE
+- Provide a UI for original owner to revoke roles to anyone else but itself
+- DAppNode may keep publishing updates until the original owner claims. It has role DEFAULT_ADMIN_ROLE so it can rotate keys if necessary
+
+## Deploy process
+
+`dnp.dappnode.eth`
+
+1. Deploy Registry contract
+
+```ts
+new Registry("dnp.dappnode.eth");
+```
+
+2. Migrate Ethereum mainnet deployed packages
+
+Iterate `dnp.dappnode.eth` registry, for each package
+
+```ts
+for (const package of mainnetRegistry) {
+  const repo = await package.getRepo();
+
+  // Publish only latest version, I see no value adding older versions
+  const latestVersion = await repo.latestVersion();
+
+  // Same content
+  const contentURI = latestVersion.contentURI;
+  const manifest = await resolveManifest(contentURI);
+
+  // For packages with upstream version switch to their version
+  const version = manifest.upstreamVersion || manifest.version;
+
+  const flags = 0b0111; // TBD (not banned, validated, active, visible)
+  Registry.newPackageWithVersion("dappmanager", devAddress, flags, version, contentURI);
+}
+```
+
+If upstreamed packages share the same version, how to release multiple versions for the same upstream version?

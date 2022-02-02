@@ -38,6 +38,8 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.4.1",
-    "@openzeppelin/contracts-upgradeable": "^4.4.0"
+    "@openzeppelin/contracts-upgradeable": "^4.4.0",
+    "ipfs-http-client": "^56.0.0",
+    "it-all": "^1.0.6"
   }
 }
