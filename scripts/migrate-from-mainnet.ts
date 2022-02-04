@@ -1,5 +1,5 @@
 import {Interface} from "ethers/lib/utils";
-import {ethers} from "hardhat";
+import {ethers,upgrades} from "hardhat";
 import fs from "fs";
 import {Registry} from "../typechain-types/Registry";
 import * as registryData from "./apm/registryABI";
@@ -85,7 +85,7 @@ async function main() {
 
   const Registry = await ethers.getContractFactory("Registry");
 
-  const registry = (await Registry.deploy(xDAIRegistryName)) as Registry;
+  const registry = (await upgrades.deployProxy(Registry, [xDAIRegistryName])) as Registry;
   await registry.deployed();
 
   console.log("Dappnode Registry Contract deployed to:", registry.address);

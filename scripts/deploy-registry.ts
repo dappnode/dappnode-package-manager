@@ -1,4 +1,4 @@
-import {ethers} from "hardhat";
+import {ethers,upgrades} from "hardhat";
 import {Registry} from "../typechain-types/Registry";
 
 async function main() {
@@ -11,7 +11,8 @@ async function main() {
   console.log("registryName:", registryName);
 
   const Registry = await ethers.getContractFactory("Registry");
-  const registry = (await Registry.deploy(registryName)) as Registry;
+
+  const registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
   await registry.deployed();
 
   console.log("#######################\n");

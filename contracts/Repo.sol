@@ -31,6 +31,8 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
    * @notice Initialize this Repo
    */
   function initialize(address _admin) public initializer {
+    __AccessControlEnumerable_init();
+    
     nextIdx = 1;
 
     _setupRole(DEFAULT_ADMIN_ROLE, _admin);

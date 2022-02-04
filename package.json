@@ -2,7 +2,7 @@
   "name": "dappnode-package-manager",
   "scripts": {
     "build": "npx hardhat compile",
-    "test": "npx hardhat test",
+    "test": "npx hardhat compile && npx hardhat test",
     "deploy:registry:hardhat": "npx hardhat run scripts/deploy-registry.ts --network hardhat",
     "deploy:registry:xDai": "npx hardhat run scripts/deploy-registry.ts --network xDAI"
   },
@@ -10,6 +10,7 @@
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.6",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@openzeppelin/hardhat-upgrades": "^1.14.0",
     "@typechain/ethers-v5": "^8.0.5",
     "@typechain/hardhat": "^3.0.0",
     "@types/chai": "^4.3.0",
