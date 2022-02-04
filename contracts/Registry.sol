@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "./Repo.sol";
 
 /**
@@ -11,7 +12,7 @@ import "./Repo.sol";
  * - assign package statuses: visible, active, validated, banned, etc
  * - basic priorization between packages in the registry in the form of a sorted non-exhaustive list
  */
-contract Registry is AccessControlEnumerable {
+contract Registry is Initializable, AccessControlEnumerableUpgradeable {
   bytes32 public constant ADD_PACKAGE_ROLE = keccak256("ADD_PACKAGE_ROLE");
   bytes32 public constant SET_STATUS_ROLE = keccak256("SET_STATUS_ROLE");
   // This role should be used only for extreme cirumstances since it breaks the immutability of packages.
@@ -46,7 +47,7 @@ contract Registry is AccessControlEnumerable {
    * @dev Name to identify this registry, i.e. 'dnp.dappnode.eth'
    */
   string public registryName;
-  address public immutable repoImplementation;
+  address public repoImplementation;
 
   uint64 internal nextIdx;
   /**
@@ -90,7 +91,9 @@ contract Registry is AccessControlEnumerable {
   /**
    * @param _registryName Name to identify this registry, i.e. 'dnp.dappnode.eth'
    */
-  constructor(string memory _registryName) {
+  function initialize(string memory _registryName) public initializer {
+    __AccessControlEnumerable_init();
+
     registryName = _registryName;
     nextIdx = 1;
     bytesPerListItem = 1;
@@ -101,6 +104,7 @@ contract Registry is AccessControlEnumerable {
     _setupRole(ADD_PACKAGE_ROLE, msg.sender);
     _setupRole(SET_STATUS_ROLE, msg.sender);
     _setupRole(SET_LIST_ROLE, msg.sender);
+    _setupRole(SET_REPO_ROLE, msg.sender);
   }
 
   /**
@@ -114,7 +118,7 @@ contract Registry is AccessControlEnumerable {
     address _dev,
     uint64 _flags
   ) external onlyAddPackageRole returns (Repo) {
-    Repo repo = Repo(Clones.clone(repoImplementation));
+    Repo repo = Repo(ClonesUpgradeable.clone(repoImplementation));
 
     repo.initialize(_dev);
 
@@ -135,7 +139,7 @@ contract Registry is AccessControlEnumerable {
     string memory _version,
     string memory _contentURI
   ) external onlyAddPackageRole returns (Repo) {
-    Repo repo = Repo(Clones.clone(repoImplementation));
+    Repo repo = Repo(ClonesUpgradeable.clone(repoImplementation));
 
     // Registry must have permissions to create the first version
     repo.initialize(address(this));
@@ -189,7 +193,7 @@ contract Registry is AccessControlEnumerable {
 
   /**
    * @notice Change package repo address.
-   * Should only be used in extreme circustances to recover a useful name.
+   * Should only be used in extreme circumstances to recover a useful name.
    */
   function setPackageRepo(uint256 packageIdx, address repo) external onlyRole(SET_REPO_ROLE) {
     Package storage package = packages[packageIdx];

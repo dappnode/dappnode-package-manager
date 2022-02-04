@@ -1,13 +1,14 @@
 import {expect} from "chai";
-import {ethers} from "hardhat";
-import {Event} from "ethers";
+import {ethers, upgrades} from "hardhat";
+import {BigNumber, Event} from "ethers";
 import {Registry, PackageStruct} from "../typechain-types/Registry";
 import {Repo, VersionStruct} from "../typechain-types/Repo";
+import {RegistryV2Mock} from "../typechain-types/RegistryV2Mock";
 
 interface RepoPackage {
   name: string;
   dev: string;
-  flags: number;
+  flags: BigNumber;
 }
 
 describe("Registry", function () {
@@ -29,12 +30,12 @@ describe("Registry", function () {
     const newPackage: RepoPackage = {
       name: "gnosis",
       dev: addr1.address,
-      flags: 0,
+      flags: ethers.BigNumber.from(0),
     };
 
     const Registry = await ethers.getContractFactory("Registry");
-    const registry = (await Registry.deploy(registryName)) as Registry;
 
+    const registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
     await registry.deployed();
 
     expect(await registry.registryName()).to.equal(registryName, "Wrong registryName");
@@ -91,19 +92,15 @@ describe("Registry", function () {
       contentURI: "/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     };
 
-    const newVersion2 = {
-      version: "0.2.0-beta.0",
-      contentURI: "/ipfs/Qmbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    };
-
     const newPackage = {
       name: "gnosis-test",
       dev: addr1.address,
-      flags: 0,
+      flags: ethers.BigNumber.from(0),
     };
 
     const Registry = await ethers.getContractFactory("Registry");
-    const registryAdmin = (await Registry.deploy(registryName)) as Registry;
+
+    const registryAdmin = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
     await registryAdmin.deployed();
 
     expect(await registryAdmin.registryName()).to.equal(registryName, "Wrong registryName");
@@ -130,6 +127,82 @@ describe("Registry", function () {
     await assertRepoVersions(repoUser, [newVersion1]);
   });
 
+  it("public.dappnode replace a malicious repo using setPackageRepo", async function () {
+    const [owner, addr1, dev] = await ethers.getSigners();
+
+    const registryName = "dnp.dappnode";
+
+    const badVersion: VersionStruct = {
+      version: "0.1.0",
+      contentURI: "/ipfs/notcorrectversion",
+    };
+
+    const badPackage: RepoPackage = {
+      name: "gnosis",
+      dev: addr1.address,
+      flags: ethers.BigNumber.from(0),
+    };
+
+    const correctPackage: RepoPackage = {
+      name: "gnosis",
+      dev: dev.address,
+      flags: ethers.BigNumber.from(0),
+    };
+    
+    const correctVersion: VersionStruct = {
+      version: "0.1.0",
+      contentURI: "/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    };
+
+    const Registry = await ethers.getContractFactory("Registry");
+    
+    const registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
+    await registry.deployed();
+
+    expect(await registry.registryName()).to.equal(registryName, "Wrong registryName");
+
+    // Publish new repo from admin account
+    const {repo: repoAddress} = await publishRepoVersion(registry, badPackage, badVersion);
+
+    // Assert registry packages
+    await assertPackages(registry, [{flags: badPackage.flags, repo: repoAddress, name: badPackage.name}])
+
+    // Replace the bad package with a new one
+    const Repo = await ethers.getContractFactory("Repo");
+    const newRepoAddress = (await upgrades.deployProxy(Repo, [dev.address],  {
+      unsafeAllow: ["constructor"],
+    })) as Repo;
+
+
+    const repoWithDev = (await ethers.getContractAt("Repo", newRepoAddress.address, dev)) as Repo;
+
+    // Publish a version on the new repo
+    const newVersionTx = await repoWithDev.newVersion(correctVersion.version, correctVersion.contentURI);
+    const newVersionReceipt = await newVersionTx.wait();
+
+    const newVersionEvent = getEvent(newVersionReceipt.events, "NewVersion");
+    expect(newVersionEvent.args!.version).to.equal(correctVersion.version, "Wrong event NewVersion.version");
+    expect(newVersionEvent.args!.contentURI).to.equal(correctVersion.contentURI, "Wrong event NewVersion.contentURI");
+
+    // Assert that there are one version in the Repo contract
+    await assertRepoVersions(repoWithDev, [correctVersion]);
+
+    // Check that the malicious package is the idx 1
+    const packageIdx = 1;
+    expect(await registry.getPackageIdx(badPackage.name)).to.be.equal(packageIdx);
+
+    // Overwrite repo address
+    const registryUser = (await ethers.getContractAt("Registry", registry.address, addr1)) as Registry;
+    expect(registryUser.setPackageRepo(packageIdx, newRepoAddress.address)).to.be.revertedWith(
+      "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0x16bd2aca01d0d7886c05a93638707d130beb22ebb67403e39bc35ee20a0de336"
+    );
+    
+    await registry.setPackageRepo(packageIdx, newRepoAddress.address);
+  
+    // Assert registry packages
+    await assertPackages(registry, [{flags: correctPackage.flags, repo: newRepoAddress.address, name: correctPackage.name}])
+  });
+
   it("public.dappnode registry publish one package and set flags", async function () {
     const [owner, addr1] = await ethers.getSigners();
 
@@ -143,12 +216,12 @@ describe("Registry", function () {
     const newPackage: RepoPackage = {
       name: "gnosis",
       dev: addr1.address,
-      flags: 0,
+      flags: ethers.BigNumber.from(0),
     };
 
     const Registry = await ethers.getContractFactory("Registry");
-    const registry = (await Registry.deploy(registryName)) as Registry;
-
+    
+    const registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
     await registry.deployed();
 
     expect(await registry.registryName()).to.equal(registryName, "Wrong registryName");
@@ -194,10 +267,38 @@ describe("Registry", function () {
 
     // Assert registry packages
     await assertPackages(registry, [{flags: bannedFlag, repo: newRepoAddress, name: newPackage.name}])
+  });
 
-    // Package should have been removed from the packageIdxByName mapping
-    await expect(registry.getPackageIdx(newPackage.name)).to.be.revertedWith("REGISTRY_INEXISTENT_NAME");
-    expect(await registry.packageIdxByName(nameHash)).to.be.equal(0);
+  it("public.dappnode registry upgradability test", async function () {
+    const registryName = "dnp.dappnode";
+
+    const Registry = await ethers.getContractFactory("Registry");
+    
+    const registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
+    await registry.deployed();
+
+    expect(await registry.registryName()).to.equal(registryName, "Wrong registryName");
+
+    // Prepare upgrade
+    const RegistryV2 = await ethers.getContractFactory("RegistryV2Mock");
+    const registryV2 = RegistryV2.attach(registry.address) as RegistryV2Mock;
+
+    // Check that the contract is not yet upgraded
+    // For some reason the expect to be reverted does not work when the function selector does not exist
+    try {
+      await registryV2.setVersion();
+      throw new Error("Unreachable code");
+    } catch(error: unknown) {
+      const { message } = error as Error;
+      expect(message).to.be.equal("Transaction reverted: function selector was not recognized and there's no fallback function");
+    }
+
+    // Upgrade the contract
+    await upgrades.upgradeProxy(registry.address, RegistryV2);
+
+    // Check upgrade
+    await registryV2.setVersion();
+    expect(await registryV2.getVersion()).to.be.equal(2);
   });
 });
 
@@ -274,7 +375,7 @@ function getEvent(events: Event[] = [], eventName: string): Event {
   return event;
 }
 
-function calculateFlagValue(visible: Boolean, active: Boolean,validated: Boolean, banned: Boolean): number {
+function calculateFlagValue(visible: Boolean, active: Boolean,validated: Boolean, banned: Boolean): BigNumber {
   const value = Number(visible) + Number(active)*2 + Number(validated)*4 + Number(banned)*8;
-  return value;
+  return ethers.BigNumber.from(value);
 }
