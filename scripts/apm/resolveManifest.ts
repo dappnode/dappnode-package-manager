@@ -13,7 +13,7 @@ export type Manifest = {
   dependencies?: Record<string, string>;
 };
 
-export async function resolveManifest(ipfsHash: string): Promise<Manifest> {
+export async function resolveManifest(ipfsHash: string, id: string): Promise<Manifest> {
   const cacheFilepath = path.join(CACHE_DIR, "manifest-" + ipfsHash.replace(/\//g, ":"));
 
   try {
@@ -23,6 +23,8 @@ export async function resolveManifest(ipfsHash: string): Promise<Manifest> {
       throw e;
     }
   }
+
+  console.log(`Resolving ${id} manifest ${ipfsHash}`);
 
   let manifest: Manifest;
   try {

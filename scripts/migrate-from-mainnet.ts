@@ -200,7 +200,7 @@ export async function getVersionData(registryName: keyof typeof dropListByRegist
     }
 
     // Manifest MUST be available
-    const manifest = await resolveManifest(latestVersion.contentUri);
+    const manifest = await resolveManifest(latestVersion.contentUri, registryPackage.name);
 
     // Transform version and contentURI
     const version = transformVersion(latestVersion.version, manifest);
