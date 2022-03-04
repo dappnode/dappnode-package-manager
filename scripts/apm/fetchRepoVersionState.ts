@@ -17,36 +17,35 @@ interface ApmRepoVersionReturn {
   contentURI: string; // bytes
 }
 
-export async function fetchRepoVersionLastPublished(
+export async function fetchRepoVersionLastNPublished(
   provider: ethers.providers.Provider,
-  repoAddress: string
-): Promise<ApmVersionState | null> {
-  const cacheFilepath = path.join(CACHE_DIR, "repo-last-published-" + repoAddress);
-  if (isFileRecent(cacheFilepath)) {
-    return JSON.parse(fs.readFileSync(cacheFilepath, "utf8"));
-  }
-
+  repoAddress: string,
+  numOfVersions: number
+): Promise<ApmVersionState[]> {
   const repo = new ethers.Contract(repoAddress, repoABI.abi, provider);
 
   const versionCount: number = await repo.getVersionsCount().then(parseFloat);
   if (versionCount === 0) {
-    return null;
+    return [];
   }
 
-  // First version is index 1
-  const res: ApmRepoVersionReturn = await repo.getByVersionId(versionCount);
+  const versions: ApmVersionState[] = [];
+  const fromId = Math.max(versionCount - numOfVersions + 1, 1);
 
-  if (!Array.isArray(res.semanticVersion)) throw Error(`property 'semanticVersion' must be an array`);
-  const version: ApmVersionState = {
-    version: res.semanticVersion.join("."),
-    // Second argument = true: ignore UTF8 parsing errors
-    // Let downstream code identify the content hash as wrong
-    contentUri: ethers.utils.toUtf8String(res.contentURI),
-  };
+  for (let i = fromId; i <= versionCount; i++) {
+    // First version is index 1
+    const res: ApmRepoVersionReturn = await repo.getByVersionId(i);
 
-  fs.writeFileSync(cacheFilepath, JSON.stringify(version, null, 2));
+    if (!Array.isArray(res.semanticVersion)) throw Error(`property 'semanticVersion' must be an array`);
+    versions.push({
+      version: res.semanticVersion.join("."),
+      // Second argument = true: ignore UTF8 parsing errors
+      // Let downstream code identify the content hash as wrong
+      contentUri: ethers.utils.toUtf8String(res.contentURI),
+    });
+  }
 
-  return version;
+  return versions;
 }
 
 function isFileRecent(filepath: string): boolean {

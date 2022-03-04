@@ -1,10 +1,12 @@
 import {ethers, upgrades} from "hardhat";
+import {ContractReceipt} from "ethers";
 import fs from "fs";
 import semver from "semver";
 import {Registry} from "../typechain-types/Registry";
-import {ApmVersionState, fetchRepoVersionLastPublished} from "./apm/fetchRepoVersionState";
+import {ApmVersionState, fetchRepoVersionLastNPublished} from "./apm/fetchRepoVersionState";
 import {readRegistry} from "./apm/writeRegistry";
-import {Manifest, resolveManifest} from "./apm/resolveManifest";
+import {resolveManifest} from "./apm/resolveManifest";
+import {Repo} from "../typechain-types/Repo";
 
 // Caveats
 // =======
@@ -16,6 +18,7 @@ import {Manifest, resolveManifest} from "./apm/resolveManifest";
 
 const VERSION_TRANSFORM: "not" | "use-upstream" = "not";
 const CONTENTURI_TRANSFORM: "not" | "ENSIP-7" = "ENSIP-7";
+const VERSIONS_TO_MIGRATE = 1;
 
 const dropListByRegistry = {
   "dnp.dappnode.eth": [
@@ -111,13 +114,15 @@ const checkManifestAvailable: Record<string, boolean> = {
   "public.dappnode.eth": false,
 };
 
-type VersionData = {
+type PackageToPublishData = {
   repoName: string;
   flags: number;
-  version: string;
-  versionChanged: string;
-  contentURIs: string[];
-  latestVersion: ApmVersionState;
+  versions: {
+    version: string;
+    versionChanged: string;
+    contentURIs: string[];
+    apmVersion: ApmVersionState;
+  }[];
 };
 
 const registryName = process.env.REGISTRY_NAME as keyof typeof dropListByRegistry;
@@ -164,21 +169,35 @@ async function deployAndMigrate(registryName: keyof typeof dropListByRegistry) {
   // Deploy all packages
 
   for (const registryPackage of dataSet.values()) {
-    console.log(`Publishing package ${registryPackage.repoName} @ ${registryPackage.version}`);
+    console.log(`Publishing package ${registryPackage.repoName} @ ${registryPackage.versions[0].version}`);
 
     const newPackageWithVersionTX = await registry.newPackageWithVersion(
       registryPackage.repoName,
       devAddress,
       registryPackage.flags,
-      registryPackage.version,
-      registryPackage.contentURIs
+      registryPackage.versions[0].version,
+      registryPackage.versions[0].contentURIs
     );
 
-    await newPackageWithVersionTX.wait();
+    const newPackageRcp = await newPackageWithVersionTX.wait();
+
+    if (registryPackage.versions.length > 1) {
+      const repoAddress = getRepoAddressFromRcp(newPackageRcp);
+      const repoWithDev = (await ethers.getContractAt("Repo", repoAddress)) as Repo;
+
+      for (const version of registryPackage.versions.slice(1)) {
+        console.log(`Publishing package ${registryPackage.repoName} @ ${version.version}`);
+
+        const newVersionTx = await repoWithDev.newVersion(version.version, version.contentURIs);
+        await newVersionTx.wait();
+      }
+    }
   }
 }
 
-export async function getVersionData(registryName: keyof typeof dropListByRegistry): Promise<Map<string, VersionData>> {
+export async function getVersionData(
+  registryName: keyof typeof dropListByRegistry
+): Promise<Map<string, PackageToPublishData>> {
   const mainnetProvider = new ethers.providers.InfuraProvider("mainnet");
 
   // Deploy all packages
@@ -186,7 +205,7 @@ export async function getVersionData(registryName: keyof typeof dropListByRegist
   const registryPackages = readRegistry(registryName);
   const dropSet = new Set(dropListByRegistry[registryName]);
 
-  const dataSet = new Map<string, VersionData>();
+  const dataSet = new Map<string, PackageToPublishData>();
 
   for (const registryPackage of registryPackages) {
     if (dropSet.has(registryPackage.name)) {
@@ -194,41 +213,58 @@ export async function getVersionData(registryName: keyof typeof dropListByRegist
       continue;
     }
 
-    // Fetch latestVersion if exists
-    // Resolve manifest
-    const latestVersion = await fetchRepoVersionLastPublished(mainnetProvider, registryPackage.repo);
-    if (latestVersion === null) {
-      console.log(`Package ${registryPackage.name} has no published version, skipping`);
-      continue;
-    }
-
-    // Transform version and contentURI
-    const version = await transformVersion(latestVersion, registryPackage.name);
-    const contentUri = transformContentURI(latestVersion.contentUri);
-
     const flags = flagsByRegistryByRepo[registryName][registryPackage.name] ?? flagsDefaultByRegistry[registryName];
     if (flags === undefined) {
       throw Error(`flags not defined for ${registryName} ${registryPackage.name}`);
     }
 
-    const versionChanged = computeVersionChange(latestVersion.version, version);
-    console.log(
-      [
-        registryPackage.name.padEnd(25),
-        versionChanged.padEnd(10),
-        `${latestVersion.version} -> ${version}`.padEnd(20),
-        contentUri,
-      ].join("\t")
-    );
-
-    dataSet.set(registryPackage.name, {
+    const pkgToPublish: PackageToPublishData = {
       repoName: registryPackage.name,
       flags,
-      version,
-      versionChanged,
-      contentURIs: [contentUri],
-      latestVersion,
-    });
+      versions: [],
+    };
+    dataSet.set(registryPackage.name, pkgToPublish);
+
+    // Fetch latestVersion if exists
+    // Resolve manifest
+    const apmVersions = await fetchRepoVersionLastNPublished(
+      mainnetProvider,
+      registryPackage.repo,
+      VERSIONS_TO_MIGRATE
+    );
+
+    if (apmVersions.length === 0) {
+      console.log(`Package ${registryPackage.name} has no published version, skipping`);
+      continue;
+    }
+
+    for (const apmVersion of apmVersions) {
+      // Only check if manifest is there for main repo
+      if (checkManifestAvailable[registryName]) {
+        await resolveManifest(apmVersion.contentUri, registryPackage.name);
+      }
+
+      // Transform version and contentURI
+      const version = await transformVersion(apmVersion, registryPackage.name);
+      const contentUri = transformContentURI(apmVersion.contentUri);
+
+      const versionChanged = computeVersionChange(apmVersion.version, version);
+      console.log(
+        [
+          registryPackage.name.padEnd(25),
+          versionChanged.padEnd(10),
+          `${apmVersion.version} -> ${version}`.padEnd(20),
+          contentUri,
+        ].join("\t")
+      );
+
+      pkgToPublish.versions.push({
+        version,
+        versionChanged,
+        contentURIs: [contentUri],
+        apmVersion,
+      });
+    }
   }
 
   return dataSet;
@@ -286,4 +322,18 @@ function computeVersionChange(prevVersion: string, nextVersion: string): string 
   if (next.patch < prev.patch) return "REGRESION_PATCH";
 
   return "SAME";
+}
+
+function getRepoAddressFromRcp(newPackageRcp: ContractReceipt): string {
+  const event = newPackageRcp.events?.find((event) => event.event === "AddPackage");
+  if (!event) {
+    throw Error("No AddPackage event found");
+  }
+
+  const repo = event.args?.repo as string | undefined;
+  if (!repo) {
+    throw Error("No arg repo in event");
+  }
+
+  return repo;
 }
