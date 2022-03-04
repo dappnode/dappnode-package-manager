@@ -19,12 +19,12 @@ describe("Registry", function () {
 
     const newVersion1: VersionStruct = {
       version: "0.1.0",
-      contentURI: "/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      contentURIs: ["/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
     };
 
     const newVersion2: VersionStruct = {
       version: "0.2.0-beta.0",
-      contentURI: "/ipfs/Qmbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      contentURIs: ["/ipfs/Qmbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
     };
 
     const newPackage: RepoPackage = {
@@ -44,7 +44,7 @@ describe("Registry", function () {
     const {repo: newRepoAddress} = await publishRepoVersion(registry, newPackage, newVersion1);
 
     // Assert registry packages
-    await assertPackages(registry, [{flags: newPackage.flags, repo: newRepoAddress, name: newPackage.name}])
+    await assertPackages(registry, [{flags: newPackage.flags, repo: newRepoAddress, name: newPackage.name}]);
 
     // Connect to deployed repo
     const repoWithAdmin = (await ethers.getContractAt("Repo", newRepoAddress, owner)) as Repo;
@@ -59,24 +59,24 @@ describe("Registry", function () {
     );
 
     // Attempt to publish version with non-auth account
-    await expect(repoWithAdmin.newVersion(newVersion1.version, newVersion1.contentURI)).to.be.revertedWith(
+    await expect(repoWithAdmin.newVersion(newVersion1.version, newVersion1.contentURIs)).to.be.revertedWith(
       "AccessControl"
     );
 
     // Attempt to publish a version on an existing version str
-    await expect(repoWithDev.newVersion(newVersion1.version, newVersion1.contentURI)).to.be.revertedWith(
+    await expect(repoWithDev.newVersion(newVersion1.version, newVersion1.contentURIs)).to.be.revertedWith(
       "REPO_EXISTENT_VERSION"
     );
 
     // Publish a version on a different version str
-    const newVersionTx = await repoWithDev.newVersion(newVersion2.version, newVersion2.contentURI, {
+    const newVersionTx = await repoWithDev.newVersion(newVersion2.version, newVersion2.contentURIs, {
       from: addr1.address,
     });
     const newVersionReceipt = await newVersionTx.wait();
 
     const newVersionEvent = getEvent(newVersionReceipt.events, "NewVersion");
     expect(newVersionEvent.args!.version).to.equal(newVersion2.version, "Wrong event NewVersion.version");
-    expect(newVersionEvent.args!.contentURI).to.equal(newVersion2.contentURI, "Wrong event NewVersion.contentURI");
+    expect(newVersionEvent.args!.contentURIs).to.equal(newVersion2.contentURIs, "Wrong event NewVersion.contentURIs");
 
     // Assert that there are two version in the Repo contract
     await assertRepoVersions(repoWithDev, [newVersion1, newVersion2]);
@@ -87,9 +87,9 @@ describe("Registry", function () {
 
     const registryName = "public.dappnode";
 
-    const newVersion1 = {
+    const newVersion1: VersionStruct = {
       version: "0.1.0",
-      contentURI: "/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      contentURIs: ["/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
     };
 
     const newPackage = {
@@ -107,9 +107,7 @@ describe("Registry", function () {
 
     // Test that non-auth users can NOT publish packages
     const registryUser = (await ethers.getContractAt("Registry", registryAdmin.address, addr1)) as Registry;
-    await expect(publishRepoVersion(registryUser, newPackage, newVersion1)).to.be.revertedWith(
-      "NO_ADD_PACKAGE_ROLE"
-    );
+    await expect(publishRepoVersion(registryUser, newPackage, newVersion1)).to.be.revertedWith("NO_ADD_PACKAGE_ROLE");
 
     // Allow anyone to publish package
     await registryAdmin.setAddPackageAnyAddress(true);
@@ -118,7 +116,7 @@ describe("Registry", function () {
     const {repo: newRepoAddress} = await publishRepoVersion(registryUser, newPackage, newVersion1);
 
     // Assert registry packages
-    await assertPackages(registryUser, [{flags: newPackage.flags, repo: newRepoAddress, name: newPackage.name}])
+    await assertPackages(registryUser, [{flags: newPackage.flags, repo: newRepoAddress, name: newPackage.name}]);
 
     // Connect to deployed repo
     const repoUser = (await ethers.getContractAt("Repo", newRepoAddress, addr1)) as Repo;
@@ -134,7 +132,7 @@ describe("Registry", function () {
 
     const badVersion: VersionStruct = {
       version: "0.1.0",
-      contentURI: "/ipfs/notcorrectversion",
+      contentURIs: ["/ipfs/notcorrectversion"],
     };
 
     const badPackage: RepoPackage = {
@@ -148,14 +146,14 @@ describe("Registry", function () {
       dev: dev.address,
       flags: ethers.BigNumber.from(0),
     };
-    
+
     const correctVersion: VersionStruct = {
       version: "0.1.0",
-      contentURI: "/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      contentURIs: ["/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
     };
 
     const Registry = await ethers.getContractFactory("Registry");
-    
+
     const registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
     await registry.deployed();
 
@@ -165,24 +163,26 @@ describe("Registry", function () {
     const {repo: repoAddress} = await publishRepoVersion(registry, badPackage, badVersion);
 
     // Assert registry packages
-    await assertPackages(registry, [{flags: badPackage.flags, repo: repoAddress, name: badPackage.name}])
+    await assertPackages(registry, [{flags: badPackage.flags, repo: repoAddress, name: badPackage.name}]);
 
     // Replace the bad package with a new one
     const Repo = await ethers.getContractFactory("Repo");
-    const newRepoAddress = (await upgrades.deployProxy(Repo, [dev.address],  {
+    const newRepoAddress = (await upgrades.deployProxy(Repo, [dev.address], {
       unsafeAllow: ["constructor"],
     })) as Repo;
-
 
     const repoWithDev = (await ethers.getContractAt("Repo", newRepoAddress.address, dev)) as Repo;
 
     // Publish a version on the new repo
-    const newVersionTx = await repoWithDev.newVersion(correctVersion.version, correctVersion.contentURI);
+    const newVersionTx = await repoWithDev.newVersion(correctVersion.version, correctVersion.contentURIs);
     const newVersionReceipt = await newVersionTx.wait();
 
     const newVersionEvent = getEvent(newVersionReceipt.events, "NewVersion");
     expect(newVersionEvent.args!.version).to.equal(correctVersion.version, "Wrong event NewVersion.version");
-    expect(newVersionEvent.args!.contentURI).to.equal(correctVersion.contentURI, "Wrong event NewVersion.contentURI");
+    expect(newVersionEvent.args!.contentURIs).to.equal(
+      correctVersion.contentURIs,
+      "Wrong event NewVersion.contentURIs"
+    );
 
     // Assert that there are one version in the Repo contract
     await assertRepoVersions(repoWithDev, [correctVersion]);
@@ -196,11 +196,13 @@ describe("Registry", function () {
     expect(registryUser.setPackageRepo(packageIdx, newRepoAddress.address)).to.be.revertedWith(
       "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0x16bd2aca01d0d7886c05a93638707d130beb22ebb67403e39bc35ee20a0de336"
     );
-    
+
     await registry.setPackageRepo(packageIdx, newRepoAddress.address);
-  
+
     // Assert registry packages
-    await assertPackages(registry, [{flags: correctPackage.flags, repo: newRepoAddress.address, name: correctPackage.name}])
+    await assertPackages(registry, [
+      {flags: correctPackage.flags, repo: newRepoAddress.address, name: correctPackage.name},
+    ]);
   });
 
   it("public.dappnode registry publish one package and set flags", async function () {
@@ -210,7 +212,7 @@ describe("Registry", function () {
 
     const newVersion1: VersionStruct = {
       version: "0.1.0",
-      contentURI: "/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      contentURIs: ["/ipfs/Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
     };
 
     const newPackage: RepoPackage = {
@@ -220,7 +222,7 @@ describe("Registry", function () {
     };
 
     const Registry = await ethers.getContractFactory("Registry");
-    
+
     const registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
     await registry.deployed();
 
@@ -230,7 +232,7 @@ describe("Registry", function () {
     const {repo: newRepoAddress} = await publishRepoVersion(registry, newPackage, newVersion1);
 
     // Assert registry packages
-    await assertPackages(registry, [{flags: newPackage.flags, repo: newRepoAddress, name: newPackage.name}])
+    await assertPackages(registry, [{flags: newPackage.flags, repo: newRepoAddress, name: newPackage.name}]);
 
     // Connect to deployed repo
     const repoWithDev = (await ethers.getContractAt("Repo", newRepoAddress, addr1)) as Repo;
@@ -256,7 +258,7 @@ describe("Registry", function () {
     await registry.setPackageStatus(packageIdx, flagValue);
 
     // Assert registry packages
-    await assertPackages(registry, [{flags: flagValue, repo: newRepoAddress, name: newPackage.name}])
+    await assertPackages(registry, [{flags: flagValue, repo: newRepoAddress, name: newPackage.name}]);
     expect(await registry.getPackageIdx(newPackage.name)).to.be.equal(packageIdx);
 
     // Calculate flag value banned
@@ -266,14 +268,14 @@ describe("Registry", function () {
     await registry.setPackageStatus(packageIdx, bannedFlag);
 
     // Assert registry packages
-    await assertPackages(registry, [{flags: bannedFlag, repo: newRepoAddress, name: newPackage.name}])
+    await assertPackages(registry, [{flags: bannedFlag, repo: newRepoAddress, name: newPackage.name}]);
   });
 
   it("public.dappnode registry upgradability test", async function () {
     const registryName = "dnp.dappnode";
 
     const Registry = await ethers.getContractFactory("Registry");
-    
+
     const registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
     await registry.deployed();
 
@@ -288,9 +290,11 @@ describe("Registry", function () {
     try {
       await registryV2.setVersion();
       throw new Error("Unreachable code");
-    } catch(error: unknown) {
-      const { message } = error as Error;
-      expect(message).to.be.equal("Transaction reverted: function selector was not recognized and there's no fallback function");
+    } catch (error: unknown) {
+      const {message} = error as Error;
+      expect(message).to.be.equal(
+        "Transaction reverted: function selector was not recognized and there's no fallback function"
+      );
     }
 
     // Upgrade the contract
@@ -305,13 +309,17 @@ describe("Registry", function () {
 /**
  * Call newPackageWithVersion and assert event is correct
  */
-async function publishRepoVersion(registry: Registry, pkg: RepoPackage, version: VersionStruct): Promise<{repo: string}> {
+async function publishRepoVersion(
+  registry: Registry,
+  pkg: RepoPackage,
+  version: VersionStruct
+): Promise<{repo: string}> {
   const newPackageWithVersionTx = await registry.newPackageWithVersion(
     pkg.name,
     pkg.dev,
     pkg.flags,
     version.version,
-    version.contentURI
+    version.contentURIs
   );
 
   // wait until the transaction is mined
@@ -342,7 +350,7 @@ async function assertRepoVersions(repo: Repo, expectedVersions: VersionStruct[])
     const version = await repo.getByVersionId(i);
     versions.push({
       version: version.version,
-      contentURI: version.contentURI,
+      contentURIs: version.contentURIs,
     });
   }
 
@@ -356,7 +364,7 @@ async function assertPackages(registry: Registry, expectedPackages: PackageStruc
   const packages: PackageStruct[] = [];
 
   for (let i = 1; i < packageCount + 1; i++) {
-    const currentPackage = await registry.packages(i) as PackageStruct;
+    const currentPackage = (await registry.packages(i)) as PackageStruct;
     packages.push({
       flags: currentPackage.flags,
       repo: currentPackage.repo,
@@ -375,7 +383,7 @@ function getEvent(events: Event[] = [], eventName: string): Event {
   return event;
 }
 
-function calculateFlagValue(visible: Boolean, active: Boolean,validated: Boolean, banned: Boolean): BigNumber {
-  const value = Number(visible) + Number(active)*2 + Number(validated)*4 + Number(banned)*8;
+function calculateFlagValue(visible: Boolean, active: Boolean, validated: Boolean, banned: Boolean): BigNumber {
+  const value = Number(visible) + Number(active) * 2 + Number(validated) * 4 + Number(banned) * 8;
   return ethers.BigNumber.from(value);
 }
