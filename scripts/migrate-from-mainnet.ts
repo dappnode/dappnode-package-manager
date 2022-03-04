@@ -106,15 +106,18 @@ const flagsDefaultByRegistry: Record<string, Flags> = {
   "public.dappnode.eth": 0b0001,
 };
 
+const checkManifestAvailable: Record<string, boolean> = {
+  "dnp.dappnode.eth": true,
+  "public.dappnode.eth": false,
+};
+
 type VersionData = {
   repoName: string;
   flags: number;
   version: string;
   versionChanged: string;
-  versionManifest: string;
   contentURIs: string[];
   latestVersion: ApmVersionState;
-  dependencies: Record<string, string>;
 };
 
 const registryName = process.env.REGISTRY_NAME as keyof typeof dropListByRegistry;
@@ -199,11 +202,8 @@ export async function getVersionData(registryName: keyof typeof dropListByRegist
       continue;
     }
 
-    // Manifest MUST be available
-    const manifest = await resolveManifest(latestVersion.contentUri, registryPackage.name);
-
     // Transform version and contentURI
-    const version = transformVersion(latestVersion.version, manifest);
+    const version = await transformVersion(latestVersion, registryPackage.name);
     const contentUri = transformContentURI(latestVersion.contentUri);
 
     const flags = flagsByRegistryByRepo[registryName][registryPackage.name] ?? flagsDefaultByRegistry[registryName];
@@ -226,22 +226,22 @@ export async function getVersionData(registryName: keyof typeof dropListByRegist
       flags,
       version,
       versionChanged,
-      versionManifest: manifest.version,
       contentURIs: [contentUri],
       latestVersion,
-      dependencies: manifest.dependencies ?? {},
     });
   }
 
   return dataSet;
 }
 
-function transformVersion(prevVersion: string, manifest: Manifest): string {
+async function transformVersion(prevVersion: ApmVersionState, id: string): Promise<string> {
   switch (VERSION_TRANSFORM) {
     case "not":
-      return prevVersion;
+      return prevVersion.version;
 
     case "use-upstream": {
+      const manifest = await resolveManifest(prevVersion.contentUri, id);
+
       if (manifest.upstreamVersion) {
         // Remove leading v if semver
         if (/^v\d/.test(manifest.upstreamVersion)) {
