@@ -13,8 +13,18 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   bytes32 public constant CREATE_VERSION_ROLE = keccak256("CREATE_VERSION_ROLE");
 
   struct Version {
+    /**
+     * @notice String representing the version. i.e. '0.1.4', '2.0.0-beta.0'
+     */
     string version;
-    string contentURI;
+    /**
+     * @notice ContentURI following ENSIP-7 Contenthash field specification (formerly EIP-1577).
+     * Refer to https://docs.ens.domains/ens-improvement-proposals/ensip-7-contenthash-field
+     * Examples:
+     * - 'ipfs://QmRAQB6YaCyidP37UdDnjFY5vQuiBrcqdyoW1CuDgwxkD'
+     * - 'bzz://d1de9994b4d039f6548d191eb26786769f580809256b4685ef316805265ea162'
+     */
+    string[] contentURIs;
   }
 
   // string public name;
@@ -22,7 +32,15 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   mapping(uint256 => Version) public versions;
   mapping(bytes32 => uint256) public versionIdForSemantic;
 
-  event NewVersion(uint256 versionId, string version, string contentURI);
+  /**
+   * @notice Algorithm to sort versions and derive "latest"
+   * - 0: Semver
+   * - 1: Alphabetical
+   * TBD
+   */
+  uint256 public versionSorting;
+
+  event NewVersion(uint256 versionId, string version, string[] contentURIs);
 
   constructor() initializer {}
 
@@ -32,7 +50,7 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
    */
   function initialize(address _admin) public initializer {
     __AccessControlEnumerable_init();
-    
+
     nextIdx = 1;
 
     _setupRole(DEFAULT_ADMIN_ROLE, _admin);
@@ -41,19 +59,29 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
 
   /**
    * @notice Create new version with contract `_contractAddress` and content `@fromHex(_contentURI)`
-   * @param _version Version string (i.e. semantic version) for new repo version
-   * @param _contentURI External URI for fetching new version's content
+   * @param _version Refer to Version.version for details
+   * @param _contentURIs Refer to Version.contentURIs for details
    */
-  function newVersion(string memory _version, string memory _contentURI) external onlyRole(CREATE_VERSION_ROLE) {
+  function newVersion(string memory _version, string[] memory _contentURIs) external onlyRole(CREATE_VERSION_ROLE) {
+    require(_contentURIs.length > 0, "EMPTY_CONTENTURIS");
+
     // Can only publish each version string once
     bytes32 versionHash = semanticVersionHash(_version);
     require(versionIdForSemantic[versionHash] == 0, "REPO_EXISTENT_VERSION");
 
     uint256 versionId = nextIdx++;
-    versions[versionId] = Version(_version, _contentURI);
+    versions[versionId] = Version(_version, _contentURIs);
     versionIdForSemantic[versionHash] = versionId;
 
-    emit NewVersion(versionId, _version, _contentURI);
+    emit NewVersion(versionId, _version, _contentURIs);
+  }
+
+  /**
+   * @notice Set the algorithm to sort versions and derive "latest"
+   * @param _versionSorting New version sorting algorithm
+   */
+  function setVersionSorting(uint256 _versionSorting) external onlyRole(CREATE_VERSION_ROLE) {
+    versionSorting = _versionSorting;
   }
 
   function getLastPublished() public view returns (Version memory) {

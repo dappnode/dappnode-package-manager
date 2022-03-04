@@ -44,6 +44,10 @@ export default {
       url: process.env.ROPSTEN_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
+    local: {
+      url: "http://localhost:8545",
+      accounts: ["0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"]
+    }
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,

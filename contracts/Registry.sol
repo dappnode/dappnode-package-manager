@@ -29,6 +29,7 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
      * 0 - active
      * 1 - validated
      * 2 - banned
+     * 3 - hidden
      */
     uint64 flags;
     /**
@@ -137,14 +138,14 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     address _dev,
     uint64 flags,
     string memory _version,
-    string memory _contentURI
+    string[] memory _contentURIs
   ) external onlyAddPackageRole returns (Repo) {
     Repo repo = Repo(ClonesUpgradeable.clone(repoImplementation));
 
     // Registry must have permissions to create the first version
     repo.initialize(address(this));
 
-    repo.newVersion(_version, _contentURI);
+    repo.newVersion(_version, _contentURIs);
 
     // Revoke permissions and grant to dev
     repo.grantRole(repo.DEFAULT_ADMIN_ROLE(), _dev);
