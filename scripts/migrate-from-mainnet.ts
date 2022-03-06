@@ -153,15 +153,27 @@ async function deployAndMigrate(registryName: keyof typeof dropListByRegistry) {
   const devAddress = accounts[0];
 
   /* Deploy Registry contract */
-  console.log("Deployment Registry Contract");
-  console.log("registryName:", registryName);
+  console.log("Registry contract", registryName);
 
-  const Registry = await ethers.getContractFactory("Registry");
+  const deployedRegistryAddress = process.env.REGISTRY_ADDRESS;
 
-  const registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
-  await registry.deployed();
+  let registry: Registry;
 
-  console.log("Dappnode Registry Contract deployed to:", registry.address);
+  // Connect to existing contract
+  if (deployedRegistryAddress) {
+    console.log(`Connecting to registry contract: ${deployedRegistryAddress}`);
+    registry = (await ethers.getContractAt("Registry", deployedRegistryAddress)) as Registry;
+  }
+
+  // Deploy
+  else {
+    console.log("Deploying new registry contract");
+    const Registry = await ethers.getContractFactory("Registry");
+    registry = (await upgrades.deployProxy(Registry, [registryName])) as Registry;
+    await registry.deployed();
+  }
+
+  console.log("Registry Contract deployed to:", registry.address);
   console.log("registryName:", await registry.registryName());
 
   const dataSet = await getVersionData(registryName);
@@ -171,12 +183,21 @@ async function deployAndMigrate(registryName: keyof typeof dropListByRegistry) {
   for (const registryPackage of dataSet.values()) {
     console.log(`Publishing package ${registryPackage.repoName} @ ${registryPackage.versions[0].version}`);
 
+    const gasPrice = 2 * 1e9;
+
+    const deployedPackage = await registry.getPackage(registryPackage.repoName).catch((e) => null);
+    if (deployedPackage) {
+      console.log(`Skipping package ${registryPackage.repoName} already deployed at ${deployedPackage.repo}`);
+      continue;
+    }
+
     const newPackageWithVersionTX = await registry.newPackageWithVersion(
       registryPackage.repoName,
       devAddress,
       registryPackage.flags,
       registryPackage.versions[0].version,
-      registryPackage.versions[0].contentURIs
+      registryPackage.versions[0].contentURIs,
+      {gasPrice}
     );
 
     const newPackageRcp = await newPackageWithVersionTX.wait();

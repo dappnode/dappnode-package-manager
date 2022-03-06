@@ -32,9 +32,9 @@ export default {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 999999
-      }
-    }
+        runs: 999999,
+      },
+    },
   },
   networks: {
     hardhat: {
@@ -44,10 +44,15 @@ export default {
       url: process.env.ROPSTEN_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
+    xdai: {
+      url: "https://rpc.gnosischain.com/",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 5,
+    },
     local: {
       url: "http://localhost:8545",
-      accounts: ["0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"]
-    }
+      accounts: ["0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"],
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,

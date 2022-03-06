@@ -1,9 +1,6 @@
 import {create} from "ipfs-http-client";
 import all from "it-all";
-import path from "path";
-import fs from "fs";
-
-const CACHE_DIR = path.join(__dirname, "../../cache");
+import {memoDisk} from "./memoDisk";
 
 const ipfs = create({url: "https://ipfs.infura.io:5001"});
 
@@ -13,32 +10,24 @@ export type Manifest = {
   dependencies?: Record<string, string>;
 };
 
-export async function resolveManifest(ipfsHash: string, id: string): Promise<Manifest> {
-  const cacheFilepath = path.join(CACHE_DIR, "manifest-" + ipfsHash.replace(/\//g, ":"));
+// Cache in disk for faster retries
+export const resolveManifest = memoDisk(
+  async function resolveManifest(ipfsHash: string, id: string): Promise<Manifest> {
+    console.log(`Resolving ${id} manifest ${ipfsHash}`);
 
-  try {
-    return JSON.parse(fs.readFileSync(cacheFilepath, "utf8"));
-  } catch (e) {
-    if ((e as {code: string}).code !== "ENOENT") {
-      throw e;
+    try {
+      // Try to resolve as manifest file first
+      return await catJson(ipfsHash);
+    } catch (e) {
+      // Else try to resolve as directory
+      return await catJson(`${ipfsHash}/dappnode_package.json`);
     }
+  },
+  {
+    toId: (ipfsHash) => `ipfs-dappnode_package-${ipfsHash}`,
+    ttlMs: Infinity,
   }
-
-  console.log(`Resolving ${id} manifest ${ipfsHash}`);
-
-  let manifest: Manifest;
-  try {
-    // Try to resolve as manifest file first
-    manifest = await catJson(ipfsHash);
-  } catch (e) {
-    // Else try to resolve as directory
-    manifest = await catJson(`${ipfsHash}/dappnode_package.json`);
-  }
-
-  fs.writeFileSync(cacheFilepath, JSON.stringify(manifest, null, 2));
-
-  return manifest;
-}
+);
 
 /**
  * Cat JSON file with disk cache
