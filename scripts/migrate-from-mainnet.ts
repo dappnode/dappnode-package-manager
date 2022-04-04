@@ -83,30 +83,29 @@ const dropListByRegistry = {
 };
 
 /**
- * 0 - active
+ * 0 - visible
  * 1 - validated
  * 2 - banned
- * 3 - hidden
  */
 type Flags = number;
 
 const flagsByRegistryByRepo: Record<string, Record<string, Flags>> = {
   "dnp.dappnode.eth": {
-    bind: 0b1011,
-    ipfs: 0b1011,
-    dappmanager: 0b1011,
-    core: 0b1011,
-    wifi: 0b1011,
-    https: 0b1011,
-    wireguard: 0b1011,
+    bind: 0b010, // validated
+    ipfs: 0b010, // validated
+    dappmanager: 0b010, // validated
+    core: 0b010, // validated
+    wifi: 0b010, // validated
+    https: 0b010, // validated
+    wireguard: 0b010, // validated
   },
 
   "public.dappnode.eth": {},
 };
 
 const flagsDefaultByRegistry: Record<string, Flags> = {
-  "dnp.dappnode.eth": 0b0011,
-  "public.dappnode.eth": 0b0001,
+  "dnp.dappnode.eth": 0b011, // visible, validated
+  "public.dappnode.eth": 0b001, // visible
 };
 
 const checkManifestAvailable: Record<string, boolean> = {

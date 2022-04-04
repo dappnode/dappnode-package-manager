@@ -26,10 +26,13 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
   struct Package {
     /**
      * @dev Bitfield with status flags, TBD
-     * 0 - active
-     * 1 - validated
-     * 2 - banned
-     * 3 - hidden
+     * 0 - visible: Display in a public list. Can be set to false for early stage
+     *     packages or while testing.
+     * 1 - validated: The quality of this package has been validated. Useful for a
+     *     governing authority to attest the package.
+     * 2 - banned: This package is damaging in some way and must not be installed
+     *     nor showed. Useful for a governing authority to attest the package and
+     *     override `visible` which may be controlled by the developer.
      */
     uint64 flags;
     /**
