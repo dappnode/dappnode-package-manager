@@ -76,7 +76,7 @@ describe("Registry", function () {
 
     const newVersionEvent = getEvent(newVersionReceipt.events, "NewVersion");
     expect(newVersionEvent.args!.version).to.equal(newVersion2.version, "Wrong event NewVersion.version");
-    expect(newVersionEvent.args!.contentURIs).to.equal(newVersion2.contentURIs, "Wrong event NewVersion.contentURIs");
+    expect(newVersionEvent.args!.contentURIs).to.deep.equal(newVersion2.contentURIs, "Wrong event NewVersion.contentURIs");
 
     // Assert that there are two version in the Repo contract
     await assertRepoVersions(repoWithDev, [newVersion1, newVersion2]);
@@ -179,7 +179,7 @@ describe("Registry", function () {
 
     const newVersionEvent = getEvent(newVersionReceipt.events, "NewVersion");
     expect(newVersionEvent.args!.version).to.equal(correctVersion.version, "Wrong event NewVersion.version");
-    expect(newVersionEvent.args!.contentURIs).to.equal(
+    expect(newVersionEvent.args!.contentURIs).to.deep.equal(
       correctVersion.contentURIs,
       "Wrong event NewVersion.contentURIs"
     );
