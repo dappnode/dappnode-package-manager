@@ -68,12 +68,12 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
     require(_contentURIs.length > 0, "EMPTY_CONTENTURIS");
 
     // Can only publish each version string once
-    bytes32 versionHash = stringHash(_version);
-    require(versionIdForSemantic[versionHash] == 0, "REPO_EXISTENT_VERSION");
+    bytes32 version32Bytes = stringToBytes32(_version);
+    require(versionIdForSemantic[version32Bytes] == 0, "REPO_EXISTENT_VERSION");
 
     uint256 versionId = nextIdx++;
     versions[versionId] = Version(_version, _contentURIs);
-    versionIdForSemantic[versionHash] = versionId;
+    versionIdForSemantic[version32Bytes] = versionId;
 
     for (uint256 i = 0; i < _tags.length; i++) {
       _setTag(_tags[i], versionId);
@@ -88,12 +88,12 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
    * @param _versionId version to point _tag to.
    */
   function setTag(string memory _tag, uint256 _versionId) external onlyRole(CREATE_VERSION_ROLE) {
-    require(_versionId < nextIdx, "REPO_INEXISTENT_VERSION");
+    require(_versionId > 0 && _versionId < nextIdx, "REPO_INEXISTENT_VERSION");
     _setTag(_tag, _versionId);
   }
 
   function getTag(string memory _tag) public view returns (Version memory) {
-    return getByVersionId(versionIdByTag[stringHash(_tag)]);
+    return getByVersionId(versionIdByTag[stringToBytes32(_tag)]);
   }
 
   function getLastPublished() public view returns (Version memory) {
@@ -101,7 +101,7 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   }
 
   function getBySemanticVersion(string memory _version) public view returns (Version memory) {
-    return getByVersionId(versionIdForSemantic[stringHash(_version)]);
+    return getByVersionId(versionIdForSemantic[stringToBytes32(_version)]);
   }
 
   function getByVersionId(uint256 _versionId) public view returns (Version memory) {
@@ -114,11 +114,13 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   }
 
   function _setTag(string memory _tag, uint256 _versionId) internal {
-    bytes32 tagHash = stringHash(_tag);
-    versionIdByTag[tagHash] = _versionId;
+    bytes32 tag32Bytes = stringToBytes32(_tag);
+    versionIdByTag[tag32Bytes] = _versionId;
   }
 
-  function stringHash(string memory version) internal pure returns (bytes32) {
-    return keccak256(abi.encodePacked(version));
+  function stringToBytes32(string memory version) internal pure returns (bytes32 data) {
+     assembly {
+            data := mload(add(version, 32))
+      }
   }
 }
