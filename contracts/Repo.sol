@@ -39,6 +39,7 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   mapping(bytes32 => uint256) internal versionIdByTag;
 
   event NewVersion(uint256 versionId, string version, string[] contentURIs);
+  event NewTag(string tag, uint256 versionId);
 
   constructor() initializer {}
 
@@ -88,7 +89,7 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
    * @param _versionId version to point _tag to.
    */
   function setTag(string memory _tag, uint256 _versionId) external onlyRole(CREATE_VERSION_ROLE) {
-    require(_versionId < nextIdx, "REPO_INEXISTENT_VERSION");
+    require(_versionId > 0 && _versionId < nextIdx, "REPO_INEXISTENT_VERSION");
     _setTag(_tag, _versionId);
   }
 
@@ -116,6 +117,8 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   function _setTag(string memory _tag, uint256 _versionId) internal {
     bytes32 tagHash = stringHash(_tag);
     versionIdByTag[tagHash] = _versionId;
+
+    emit NewTag(_tag, _versionId);
   }
 
   function stringHash(string memory version) internal pure returns (bytes32) {
