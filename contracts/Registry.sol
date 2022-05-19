@@ -141,14 +141,15 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     address _dev,
     uint64 flags,
     string memory _version,
-    string[] memory _contentURIs
+    string[] memory _contentURIs,
+    string[] memory _tags
   ) external onlyAddPackageRole returns (Repo) {
     Repo repo = Repo(ClonesUpgradeable.clone(repoImplementation));
 
     // Registry must have permissions to create the first version
     repo.initialize(address(this));
 
-    repo.newVersion(_version, _contentURIs);
+    repo.newVersion(_version, _contentURIs, _tags);
 
     // Revoke permissions and grant to dev
     repo.grantRole(repo.DEFAULT_ADMIN_ROLE(), _dev);
