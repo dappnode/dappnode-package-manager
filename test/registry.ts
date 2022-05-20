@@ -2,7 +2,7 @@ import {expect} from "chai";
 import {ethers, upgrades} from "hardhat";
 import {BigNumber, Event} from "ethers";
 import {Registry, PackageStruct} from "../typechain-types/Registry";
-import {Repo, VersionStruct} from "../typechain-types/Repo";
+import {Repo, VersionStruct, VersionStructOutput} from "../typechain-types/Repo";
 import {RegistryV2Mock} from "../typechain-types/RegistryV2Mock";
 
 interface RepoPackage {
@@ -59,27 +59,32 @@ describe("Registry", function () {
     );
 
     // Attempt to publish version with non-auth account
-    await expect(repoWithAdmin.newVersion(newVersion1.version, newVersion1.contentURIs)).to.be.revertedWith(
+    await expect(repoWithAdmin.newVersion(newVersion1.version, newVersion1.contentURIs, ["latest"])).to.be.revertedWith(
       "AccessControl"
     );
 
     // Attempt to publish a version on an existing version str
-    await expect(repoWithDev.newVersion(newVersion1.version, newVersion1.contentURIs)).to.be.revertedWith(
+    await expect(repoWithDev.newVersion(newVersion1.version, newVersion1.contentURIs, ["latest"])).to.be.revertedWith(
       "REPO_EXISTENT_VERSION"
     );
 
     // Publish a version on a different version str
-    const newVersionTx = await repoWithDev.newVersion(newVersion2.version, newVersion2.contentURIs, {
+    const newVersionTx = await repoWithDev.newVersion(newVersion2.version, newVersion2.contentURIs, ["latest"], {
       from: addr1.address,
     });
     const newVersionReceipt = await newVersionTx.wait();
 
     const newVersionEvent = getEvent(newVersionReceipt.events, "NewVersion");
     expect(newVersionEvent.args!.version).to.equal(newVersion2.version, "Wrong event NewVersion.version");
-    expect(newVersionEvent.args!.contentURIs).to.deep.equal(newVersion2.contentURIs, "Wrong event NewVersion.contentURIs");
+    expect(newVersionEvent.args!.contentURIs).to.deep.equal(
+      newVersion2.contentURIs,
+      "Wrong event NewVersion.contentURIs"
+    );
 
     // Assert that there are two version in the Repo contract
     await assertRepoVersions(repoWithDev, [newVersion1, newVersion2]);
+
+    expect(toVersion(await repoWithDev.getTag("latest"))).to.deep.equal(newVersion2, "Wrong 'latest' tag");
   });
 
   it("public.dappnode registry publish one package and validate", async function () {
@@ -174,7 +179,7 @@ describe("Registry", function () {
     const repoWithDev = (await ethers.getContractAt("Repo", newRepoAddress.address, dev)) as Repo;
 
     // Publish a version on the new repo
-    const newVersionTx = await repoWithDev.newVersion(correctVersion.version, correctVersion.contentURIs);
+    const newVersionTx = await repoWithDev.newVersion(correctVersion.version, correctVersion.contentURIs, ["latest"]);
     const newVersionReceipt = await newVersionTx.wait();
 
     const newVersionEvent = getEvent(newVersionReceipt.events, "NewVersion");
@@ -319,7 +324,8 @@ async function publishRepoVersion(
     pkg.dev,
     pkg.flags,
     version.version,
-    version.contentURIs
+    version.contentURIs,
+    ["latest"]
   );
 
   // wait until the transaction is mined
@@ -348,10 +354,7 @@ async function assertRepoVersions(repo: Repo, expectedVersions: VersionStruct[])
 
   for (let i = 1; i < versionCount + 1; i++) {
     const version = await repo.getByVersionId(i);
-    versions.push({
-      version: version.version,
-      contentURIs: version.contentURIs,
-    });
+    versions.push(toVersion(version));
   }
 
   expect(versions).to.deep.equal(expectedVersions, "Wrong versions in repo");
@@ -386,4 +389,11 @@ function getEvent(events: Event[] = [], eventName: string): Event {
 function calculateFlagValue(visible: Boolean, active: Boolean, validated: Boolean, banned: Boolean): BigNumber {
   const value = Number(visible) + Number(active) * 2 + Number(validated) * 4 + Number(banned) * 8;
   return ethers.BigNumber.from(value);
+}
+
+function toVersion(version: VersionStructOutput): VersionStruct {
+  return {
+    version: version.version,
+    contentURIs: version.contentURIs,
+  };
 }

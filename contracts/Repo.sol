@@ -33,12 +33,10 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   mapping(bytes32 => uint256) public versionIdForSemantic;
 
   /**
-   * @notice Algorithm to sort versions and derive "latest"
-   * - 0: Semver
-   * - 1: Alphabetical
-   * TBD
+   * @notice Map of tag hashes to versionId. Allows to map "latest" -> "v1.0.0".
+   * use getTag() for querying and setTag() for setting.
    */
-  uint256 public versionSorting;
+  mapping(bytes32 => uint256) internal versionIdByTag;
 
   event NewVersion(uint256 versionId, string version, string[] contentURIs);
 
@@ -62,26 +60,40 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
    * @param _version Refer to Version.version for details
    * @param _contentURIs Refer to Version.contentURIs for details
    */
-  function newVersion(string memory _version, string[] memory _contentURIs) external onlyRole(CREATE_VERSION_ROLE) {
+  function newVersion(
+    string memory _version,
+    string[] memory _contentURIs,
+    string[] memory _tags
+  ) external onlyRole(CREATE_VERSION_ROLE) {
     require(_contentURIs.length > 0, "EMPTY_CONTENTURIS");
 
     // Can only publish each version string once
-    bytes32 versionHash = semanticVersionHash(_version);
+    bytes32 versionHash = stringHash(_version);
     require(versionIdForSemantic[versionHash] == 0, "REPO_EXISTENT_VERSION");
 
     uint256 versionId = nextIdx++;
     versions[versionId] = Version(_version, _contentURIs);
     versionIdForSemantic[versionHash] = versionId;
 
+    for (uint256 i = 0; i < _tags.length; i++) {
+      _setTag(_tags[i], versionId);
+    }
+
     emit NewVersion(versionId, _version, _contentURIs);
   }
 
   /**
-   * @notice Set the algorithm to sort versions and derive "latest"
-   * @param _versionSorting New version sorting algorithm
+   * @notice Set a tag to an existing version.
+   * @param _tag tag to set.
+   * @param _versionId version to point _tag to.
    */
-  function setVersionSorting(uint256 _versionSorting) external onlyRole(CREATE_VERSION_ROLE) {
-    versionSorting = _versionSorting;
+  function setTag(string memory _tag, uint256 _versionId) external onlyRole(CREATE_VERSION_ROLE) {
+    require(_versionId < nextIdx, "REPO_INEXISTENT_VERSION");
+    _setTag(_tag, _versionId);
+  }
+
+  function getTag(string memory _tag) public view returns (Version memory) {
+    return getByVersionId(versionIdByTag[stringHash(_tag)]);
   }
 
   function getLastPublished() public view returns (Version memory) {
@@ -89,7 +101,7 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
   }
 
   function getBySemanticVersion(string memory _version) public view returns (Version memory) {
-    return getByVersionId(versionIdForSemantic[semanticVersionHash(_version)]);
+    return getByVersionId(versionIdForSemantic[stringHash(_version)]);
   }
 
   function getByVersionId(uint256 _versionId) public view returns (Version memory) {
@@ -101,7 +113,12 @@ contract Repo is Initializable, AccessControlEnumerableUpgradeable {
     return nextIdx - 1;
   }
 
-  function semanticVersionHash(string memory version) internal pure returns (bytes32) {
+  function _setTag(string memory _tag, uint256 _versionId) internal {
+    bytes32 tagHash = stringHash(_tag);
+    versionIdByTag[tagHash] = _versionId;
+  }
+
+  function stringHash(string memory version) internal pure returns (bytes32) {
     return keccak256(abi.encodePacked(version));
   }
 }
