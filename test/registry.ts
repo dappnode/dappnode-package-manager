@@ -81,6 +81,10 @@ describe("Registry", function () {
       "Wrong event NewVersion.contentURIs"
     );
 
+    const newTagEvent = getEvent(newVersionReceipt.events, "NewTag");
+    expect(newTagEvent.args!.tag).to.equal("latest", "Wrong event NewTag.tag");
+    expect(newTagEvent.args!.version).to.equal(newVersion2.version, "Wrong event NewTag.version");
+
     // Assert that there are two version in the Repo contract
     await assertRepoVersions(repoWithDev, [newVersion1, newVersion2]);
 
@@ -188,6 +192,10 @@ describe("Registry", function () {
       correctVersion.contentURIs,
       "Wrong event NewVersion.contentURIs"
     );
+
+    const newTagEvent = getEvent(newVersionReceipt.events, "NewTag");
+    expect(newTagEvent.args!.tag).to.equal("latest", "Wrong event NewTag.tag");
+    expect(newTagEvent.args!.version).to.equal(correctVersion.version, "Wrong event NewTag.version");
 
     // Assert that there are one version in the Repo contract
     await assertRepoVersions(repoWithDev, [correctVersion]);

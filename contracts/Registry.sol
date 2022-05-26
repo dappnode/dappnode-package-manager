@@ -140,9 +140,9 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     string memory _name,
     address _dev,
     uint64 flags,
-    string memory _version,
-    string[] memory _contentURIs,
-    string[] memory _tags
+    string calldata _version,
+    string[] calldata _contentURIs,
+    string[] calldata _tags
   ) external onlyAddPackageRole returns (Repo) {
     Repo repo = Repo(ClonesUpgradeable.clone(repoImplementation));
 
