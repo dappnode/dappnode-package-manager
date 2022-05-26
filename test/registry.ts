@@ -40,7 +40,7 @@ describe("Registry", function () {
 
     expect(await registry.registryName()).to.equal(registryName, "Wrong registryName");
 
-    // Publish new repo from admin account
+    // Publish new repo from admin account, versionId = 1
     const {repo: newRepoAddress} = await publishRepoVersion(registry, newPackage, newVersion1);
 
     // Assert registry packages
@@ -68,7 +68,7 @@ describe("Registry", function () {
       "REPO_EXISTENT_VERSION"
     );
 
-    // Publish a version on a different version str
+    // Publish a version on a different version str, versionId = 2
     const newVersionTx = await repoWithDev.newVersion(newVersion2.version, newVersion2.contentURIs, ["latest"], {
       from: addr1.address,
     });
@@ -76,14 +76,12 @@ describe("Registry", function () {
 
     const newVersionEvent = getEvent(newVersionReceipt.events, "NewVersion");
     expect(newVersionEvent.args!.version).to.equal(newVersion2.version, "Wrong event NewVersion.version");
-    expect(newVersionEvent.args!.contentURIs).to.deep.equal(
-      newVersion2.contentURIs,
-      "Wrong event NewVersion.contentURIs"
-    );
+    expect(newVersionEvent.args!.versionId).to.equal(2, "Wrong event NewVersion.versionId");
+    expect(newVersionEvent.args!.contentURIs).to.deep.equal(newVersion2.contentURIs, "Wrong NewVersion.contentURIs");
 
     const newTagEvent = getEvent(newVersionReceipt.events, "NewTag");
     expect(newTagEvent.args!.tag).to.equal("latest", "Wrong event NewTag.tag");
-    expect(newTagEvent.args!.version).to.equal(newVersion2.version, "Wrong event NewTag.version");
+    expect(newTagEvent.args!.versionId).to.equal(2, "Wrong event NewTag.versionId");
 
     // Assert that there are two version in the Repo contract
     await assertRepoVersions(repoWithDev, [newVersion1, newVersion2]);
@@ -168,7 +166,7 @@ describe("Registry", function () {
 
     expect(await registry.registryName()).to.equal(registryName, "Wrong registryName");
 
-    // Publish new repo from admin account
+    // Publish new repo from admin account, versionId = 1
     const {repo: repoAddress} = await publishRepoVersion(registry, badPackage, badVersion);
 
     // Assert registry packages
@@ -182,20 +180,18 @@ describe("Registry", function () {
 
     const repoWithDev = (await ethers.getContractAt("Repo", newRepoAddress.address, dev)) as Repo;
 
-    // Publish a version on the new repo
+    // Publish a version on the new repo, versionId = 1
     const newVersionTx = await repoWithDev.newVersion(correctVersion.version, correctVersion.contentURIs, ["latest"]);
     const newVersionReceipt = await newVersionTx.wait();
 
     const newVersionEvent = getEvent(newVersionReceipt.events, "NewVersion");
     expect(newVersionEvent.args!.version).to.equal(correctVersion.version, "Wrong event NewVersion.version");
-    expect(newVersionEvent.args!.contentURIs).to.deep.equal(
-      correctVersion.contentURIs,
-      "Wrong event NewVersion.contentURIs"
-    );
+    expect(newVersionEvent.args!.versionId).to.equal(1, "Wrong event NewVersion.versionId");
+    expect(newVersionEvent.args!.contentURIs).to.deep.equal(correctVersion.contentURIs, "Wrong NewVersion.contentURIs");
 
     const newTagEvent = getEvent(newVersionReceipt.events, "NewTag");
     expect(newTagEvent.args!.tag).to.equal("latest", "Wrong event NewTag.tag");
-    expect(newTagEvent.args!.version).to.equal(correctVersion.version, "Wrong event NewTag.version");
+    expect(newTagEvent.args!.versionId).to.equal(1, "Wrong event NewTag.versionId");
 
     // Assert that there are one version in the Repo contract
     await assertRepoVersions(repoWithDev, [correctVersion]);
